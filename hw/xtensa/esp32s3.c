@@ -243,7 +243,6 @@ static void esp32s3_soc_add_periph_device(MemoryRegion *dest, void* dev, hwaddr 
 
 static void esp32S3_machine_init_psram(Esp32s3SocState *ms, uint32_t size_mbytes)
 {
-    info_report("esp32S3_machine_init_psram, size_mbytes=%d", size_mbytes);
    /* PSRAM attached to SPI1, CS1 */
     DeviceState *spi_master = DEVICE(&ms->spi1);
     BusState* spi_bus = qdev_get_child_bus(spi_master, "spi");
