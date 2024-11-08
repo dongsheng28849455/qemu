@@ -722,6 +722,7 @@ static void esp32_machine_init_psram(Esp32SocState *ss, uint32_t size_mbytes)
     DeviceState *psram = qdev_new(TYPE_SSI_PSRAM);
     qdev_prop_set_uint32(psram, "size_mbytes", size_mbytes);
     qdev_prop_set_uint8(psram, "cs", 1);
+    qdev_prop_set_int32(psram, "dummy", 1);
     qdev_realize_and_unref(psram, spi_bus, &error_fatal);
     qdev_connect_gpio_out_named(spi_master, SSI_GPIO_CS, 1,
                                 qdev_get_gpio_in_named(psram, SSI_GPIO_CS, 0));

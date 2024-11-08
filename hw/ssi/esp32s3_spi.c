@@ -105,6 +105,9 @@ static uint64_t esp32s3_spi_read(void *opaque, hwaddr addr, unsigned int size)
         case A_SPI_MEM_SUS_STATUS:
             r = s->mem_sus_st;
             break;
+        case A_SPI_MEM_MISC:
+            r = s->mem_misc;
+            break;
         default:
 #if SPI1_WARNING
             warn_report("[SPI1] Unsupported read to 0x%lx", addr);
@@ -143,6 +146,17 @@ static void esp32s3_spi_dummy_cycles(ESP32S3SpiState *s, uint32_t dummy_bytes) {
     }
 }
 
+static void esp32s3_spi_cs_set(ESP32S3SpiState *s, int value)
+{
+    uint32_t cs_psram = FIELD_EX32(s->mem_misc, SPI_MEM_MISC, CS0_DIS);
+    uint32_t cs_flash = FIELD_EX32(s->mem_misc, SPI_MEM_MISC, CS1_DIS);
+
+    if(cs_psram)
+        qemu_set_irq(s->cs_gpio[1], value);
+    if(cs_flash)
+        qemu_set_irq(s->cs_gpio[0], value);
+}
+
 static void esp32s3_spi_perform_transaction(ESP32S3SpiState *s, ESP32S3SpiTransaction *t)
 {
     if (s->xts_aes != NULL)
@@ -155,12 +169,12 @@ static void esp32s3_spi_perform_transaction(ESP32S3SpiState *s, ESP32S3SpiTransa
         }
     }
 
-    qemu_set_irq(s->cs_gpio[0], 0);
+    esp32s3_spi_cs_set(s, 0);
     esp32s3_spi_txrx_buffer(s, &t->cmd, t->cmd_bytes, NULL, 0);
     esp32s3_spi_txrx_buffer(s, &t->addr, t->addr_bytes, NULL, 0);
     esp32s3_spi_dummy_cycles(s, t->dummy_bytes);
     esp32s3_spi_txrx_buffer(s, t->data, t->tx_bytes, t->data, t->rx_bytes);
-    qemu_set_irq(s->cs_gpio[0], 1);
+    esp32s3_spi_cs_set(s, 1);
 }
 
 
@@ -391,6 +405,9 @@ static void esp32s3_spi_write(void *opaque, hwaddr addr,
         case A_SPI_MEM_SUS_STATUS:
             s->mem_sus_st = wvalue;
             break;
+        case A_SPI_MEM_MISC:
+            s->mem_misc = wvalue;
+            break;
         default:
 #if SPI1_WARNING
             warn_report("[SPI1] Unsupported write to 0x%lx (%08lx)", addr, value);
@@ -423,7 +440,10 @@ static void esp32s3_spi_reset(DeviceState *dev)
 
     s->mem_user2 = FIELD_DP32(s->mem_user2, SPI_MEM_USER2, USR_COMMAND_BITLEN, 7);
 
-    /* In case more registers are supported in the future (MEM_MISC, MEM_TX_CRC, ...)
+    s->mem_misc  = FIELD_DP32(s->mem_misc, SPI_MEM_MISC, CS0_DIS, 0);
+    s->mem_misc  = FIELD_DP32(s->mem_misc, SPI_MEM_MISC, CS1_DIS, 0);
+
+    /* In case more registers are supported in the future (MEM_TX_CRC, ...)
      * update this function with their default values */
 }
 

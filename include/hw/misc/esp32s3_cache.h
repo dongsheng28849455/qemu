@@ -91,6 +91,7 @@ typedef struct {
     hwaddr       icache_base;
     MemoryRegion dcache;
     MemoryRegion icache;
+    MemoryRegion psram;
 
     /* Registers for controlling the cache */
     uint32_t regs[ESP32S3_CACHE_REG_COUNT];

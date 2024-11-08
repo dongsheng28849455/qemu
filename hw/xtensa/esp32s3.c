@@ -241,6 +241,21 @@ static void esp32s3_soc_add_periph_device(MemoryRegion *dest, void* dev, hwaddr 
 
 #define MB (1024*1024)
 
+static void esp32S3_machine_init_psram(Esp32s3SocState *ms, uint32_t size_mbytes)
+{
+    info_report("esp32S3_machine_init_psram, size_mbytes=%d", size_mbytes);
+   /* PSRAM attached to SPI1, CS1 */
+    DeviceState *spi_master = DEVICE(&ms->spi1);
+    BusState* spi_bus = qdev_get_child_bus(spi_master, "spi");
+    DeviceState *psram = qdev_new(TYPE_SSI_PSRAM);
+    qdev_prop_set_uint32(psram, "size_mbytes", size_mbytes);
+    qdev_prop_set_uint8(psram, "cs", 1);
+    qdev_prop_set_int32(psram, "dummy", 0);
+    qdev_realize_and_unref(psram, spi_bus, &error_fatal);
+    qdev_connect_gpio_out_named(spi_master, SSI_GPIO_CS, 1,
+                                qdev_get_gpio_in_named(psram, SSI_GPIO_CS, 0));
+}
+
 static void esp32s3_init_spi_flash(Esp32s3SocState *ms, BlockBackend* blk)
 {
     DeviceState *spi_master = DEVICE(&ms->spi1);
@@ -643,6 +658,10 @@ static void esp32s3_machine_init(MachineState *machine)
         }
     }
 
+    if (machine->ram_size > 0) {
+        esp32S3_machine_init_psram(ss, (uint32_t) (machine->ram_size / MiB));
+    }
+
     /* (Extmem) Cache realization */
     {
         if (blk) {
@@ -893,9 +912,15 @@ static ram_addr_t esp32s3_fixup_ram_size(ram_addr_t requested_size)
         size = 2 * MiB;
     } else if (requested_size <= 4 * MiB ) {
         size = 4 * MiB;
-    } else {
-        qemu_log("RAM size larger than 4 MB not supported\n");
-        size = 4 * MiB;
+    } else if (requested_size <= 8 * MiB ) {
+        size = 8 * MiB;
+    } else if (requested_size <= 16 * MiB ) {
+        size = 16 * MiB;
+    } else if (requested_size <= 32 * MiB ) {
+        size = 32 * MiB;
+    }  else {
+        qemu_log("RAM size larger than 32 MB not supported\n");
+        size = 32 * MiB;
     }
     return size;
 }

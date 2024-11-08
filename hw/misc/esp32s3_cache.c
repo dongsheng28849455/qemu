@@ -61,11 +61,12 @@ static inline void esp32s3_write_mmu_value(ESP32S3CacheState *s, hwaddr reg_addr
     ESP32S3XtsAesClass *xts_aes_class = ESP32S3_XTS_AES_GET_CLASS(s->xts_aes);
     /* Make the assumption that the address is aligned on sizeof(uint32_t) */
     const uint32_t index = reg_addr / sizeof(uint32_t);
+
     /* Reserved bits shall always be 0 */
-    ESP32S3MMUEntry e = { .val = value };
-    /* Always keep reserved as 0 */
+    ESP32S3MMUEntry e;
     e.reserved = 0;
     // info_report("[CACHE] esp32s3_write_mmu_value 0x%lx = %08x, index=%i", reg_addr, value, index);
+    e.val = value;
     if (s->mmu[index].val != e.val) {
         /* Update the cache (MemoryRegion) */
         const uint32_t virtual_address = index * ESP32S3_PAGE_SIZE;
@@ -244,21 +245,6 @@ static const MemoryRegionOps esp32s3_cache_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
-static bool esp32s3_cache_mem_accepts(void *opaque, hwaddr addr,
-                                      unsigned size, bool is_write,
-                                      MemTxAttrs attrs)
-{
-    /* Only accept operation in the cache if there are in READ access.
-     * TODO: Refuse any access to the cache if disable and trigger an exception. */
-    return !is_write;
-}
-
-static const MemoryRegionOps esp32s3_cache_mem_ops = {
-    .write = NULL,
-    .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid.accepts = esp32s3_cache_mem_accepts,
-};
-
 static void esp32s3_cache_reset(DeviceState *dev)
 {
     ESP32S3CacheState *s = ESP32S3_CACHE(dev);
@@ -304,16 +290,15 @@ static void esp32s3_cache_init(Object *obj)
     memory_region_init_io(&s->iomem, obj, &esp32s3_cache_ops, s,
                           TYPE_ESP32S3_DCACHE, TYPE_ESP32S3_CACHE_IO_SIZE + ESP32S3_MMU_SIZE);
 
+    memory_region_init_ram(&s->psram, OBJECT(s),"psram", ESP32S3_EXTMEM_REGION_SIZE, &error_fatal);
+
     /* Initialize the data cache area first */
     s->dcache_base = ESP32S3_DCACHE_BASE;
-    memory_region_init_rom_device(&s->dcache, OBJECT(s),
-                                  &esp32s3_cache_mem_ops, s,
-                                  "cpu0-dcache", ESP32S3_EXTMEM_REGION_SIZE, &error_abort);
+    memory_region_init_alias(&s->dcache, OBJECT(s), "cpu0-dcache", &s->psram, 0, ESP32S3_EXTMEM_REGION_SIZE);
 
     /* Same goes for the instruction cache */
     s->icache_base = ESP32S3_ICACHE_BASE;
-    memory_region_init_alias(&s->icache, OBJECT(s), "cpu0-icache", &s->dcache, 0, ESP32S3_EXTMEM_REGION_SIZE);
-
+    memory_region_init_alias(&s->icache, OBJECT(s), "cpu0-icache", &s->psram, 0, ESP32S3_EXTMEM_REGION_SIZE);
     sysbus_init_mmio(sbd, &s->iomem);
 }
 

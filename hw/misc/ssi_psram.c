@@ -15,7 +15,7 @@
 #include "hw/qdev-properties.h"
 #include "hw/misc/ssi_psram.h"
 
-#define CMD_READ_ID 0x9f
+#define CMD_READ_ID  0x9f
 #define PSRAM_ID_MFG 0x0d
 #define PSRAM_ID_KGD 0x5d
 
@@ -28,6 +28,10 @@ static int get_eid_by_size(uint32_t size_mbytes) {
         return 0x21;
     case 8:
         return 0x40;
+    case 16:
+        return 0x60;
+    case 32:
+        return 0x80;
     default:
         qemu_log_mask(LOG_UNIMP, "%s: PSRAM size %" PRIu32 "MB not implemented\n",
                       __func__, size_mbytes);
@@ -81,12 +85,12 @@ static int psram_cs(SSIPeripheral *ss, bool select)
 
 static void psram_realize(SSIPeripheral *ss, Error **errp)
 {
-    SsiPsramState *s = SSI_PSRAM(ss);
-    s->dummy = 1;
+
 }
 
 static Property psram_properties[] = {
     DEFINE_PROP_UINT32("size_mbytes", SsiPsramState, size_mbytes, 4),
+    DEFINE_PROP_INT32("dummy", SsiPsramState, dummy, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
 
